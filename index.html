@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Promo Ottawa</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero card">
+      <div>
+        <div class="eyebrow">OTTAWA • DEALS • PROMOS</div>
+        <h1>Promo Ottawa</h1>
+        <p>Entre un produit, trouve où l’acheter à Ottawa et repère rapidement les meilleures promos.</p>
+      </div>
+      <div class="hero-badge">🛒💸</div>
+    </section>
+
+    <section class="search-panel card">
+      <form id="searchForm" class="search-grid">
+        <input id="queryInput" placeholder="Ex: lait, PS5, écran 27 pouces, baskets..." required />
+        <select id="areaSelect">
+          <option>Ottawa</option>
+          <option>Orléans</option>
+          <option>Kanata</option>
+          <option>Gatineau</option>
+        </select>
+        <select id="sortSelect">
+          <option value="promo">Trier: meilleures promos</option>
+          <option value="price">Trier: prix croissant</option>
+          <option value="store">Trier: magasin</option>
+        </select>
+        <label class="check"><input type="checkbox" id="promoOnly" /> Promo seulement</label>
+        <button type="submit">Chercher</button>
+      </form>
+      <div class="sources">Sources simulées pour prototype : Walmart, Best Buy, Canadian Tire, Costco, Amazon, Pharmaprix.</div>
+    </section>
+
+    <section class="stats-grid" id="statsGrid"></section>
+
+    <section class="card">
+      <div class="section-head">
+        <h2>Résultats</h2>
+        <button id="seedBtn" class="secondary">Exemple rapide</button>
+      </div>
+      <div id="emptyState" class="empty">Lance une recherche pour voir les meilleurs bons plans à Ottawa.</div>
+      <div id="results" class="results"></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
