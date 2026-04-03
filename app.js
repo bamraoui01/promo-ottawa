@@ -8,34 +8,7 @@ const statsGrid = document.getElementById('statsGrid');
 const emptyState = document.getElementById('emptyState');
 const seedBtn = document.getElementById('seedBtn');
 
-const stores = ['Walmart', 'Best Buy', 'Canadian Tire', 'Costco', 'Amazon', 'Pharmaprix'];
-const areas = ['Ottawa', 'Orléans', 'Kanata', 'Gatineau'];
-
-function hashCode(str){ return [...str].reduce((a,c)=>((a<<5)-a)+c.charCodeAt(0),0); }
 function money(v){ return `${Number(v).toFixed(2)} CAD`; }
-
-function generateDeals(query, area){
-  const seed = Math.abs(hashCode(query + area));
-  return stores.map((store, i) => {
-    const base = ((seed % 90) + 10 + i * 3);
-    const promo = (seed + i) % 3 !== 0;
-    const discount = promo ? [10,15,20,25,30][(seed + i) % 5] : 0;
-    const oldPrice = base + ((seed + i) % 20);
-    const price = promo ? (oldPrice * (100 - discount) / 100) : base;
-    const localArea = areas[(seed + i) % areas.length];
-    return {
-      store,
-      title: `${query.charAt(0).toUpperCase() + query.slice(1)} — ${store}`,
-      area: localArea,
-      price: price.toFixed(2),
-      oldPrice: promo ? oldPrice.toFixed(2) : null,
-      promo,
-      discount,
-      note: promo ? `Promo repérée • économie de ${discount}%` : 'Prix standard détecté',
-      link: '#'
-    };
-  }).filter(d => area === 'Ottawa' ? true : d.area === area);
-}
 
 function renderStats(deals){
   if(!deals.length){ statsGrid.innerHTML = ''; return; }
@@ -45,9 +18,9 @@ function renderStats(deals){
   const best = deals.find(d => Number(d.price) === lowest);
   statsGrid.innerHTML = `
     <div class="stat"><div class="label">Résultats</div><div class="value">${deals.length}</div></div>
-    <div class="stat"><div class="label">Promos</div><div class="value">${promoCount}</div></div>
+    <div class="stat"><div class="label">Promos réelles</div><div class="value">${promoCount}</div></div>
     <div class="stat"><div class="label">Meilleur prix</div><div class="value">${money(lowest)}</div></div>
-    <div class="stat"><div class="label">Meilleur magasin</div><div class="value">${best?.store || '—'}</div></div>`;
+    <div class="stat"><div class="label">Source</div><div class="value">Walmart</div></div>`;
 }
 
 function renderDeals(deals){
@@ -62,20 +35,73 @@ function renderDeals(deals){
       <div><span class="pill ${d.promo ? 'promo' : 'normal'}">${d.promo ? 'PROMO' : 'STANDARD'}</span></div>
       <div>
         <div class="price">${money(d.price)}</div>
-        ${d.oldPrice ? `<div class="old-price">${money(d.oldPrice)}</div><div class="save">-${d.discount}%</div>` : ''}
+        ${d.oldPrice ? `<div class="old-price">${money(d.oldPrice)}</div><div class="save">-${d.discountText}</div>` : ''}
       </div>
-      <div><a href="${d.link}">Voir</a></div>
+      <div><a href="${d.link}" target="_blank">Voir</a></div>
     </div>`).join('');
 }
 
-function runSearch(query){
-  let deals = generateDeals(query, areaSelect.value);
-  if(promoOnly.checked) deals = deals.filter(d => d.promo);
-  if(sortSelect.value === 'price') deals.sort((a,b) => Number(a.price) - Number(b.price));
-  else if(sortSelect.value === 'store') deals.sort((a,b) => a.store.localeCompare(b.store));
-  else deals.sort((a,b) => (b.discount||0) - (a.discount||0) || Number(a.price)-Number(b.price));
-  renderStats(deals);
-  renderDeals(deals);
+async function fetchWalmartDeals(query){
+  const url = `https://r.jina.ai/http://https://www.walmart.ca/en/search?q=${encodeURIComponent(query + ' ottawa')}`;
+  const text = await fetch(url).then(r => r.text());
+  const lines = text.split('\n');
+  const deals = [];
+  for(let i=0;i<lines.length;i++){
+    const line = lines[i].trim();
+    const linkMatch = line.match(/^\[(.+?)\]\((https:\/\/www\.walmart\.ca\/en\/ip\/[^)]+)\)$/);
+    if(!linkMatch) continue;
+    const title = linkMatch[1].trim();
+    const link = linkMatch[2];
+    const block = lines.slice(i, i+22).join(' ');
+    const nowMatch = block.match(/Now \$(\d+[.]\d{2}).*?Was \$(\d+[.]\d{2})/i);
+    const currentMatch = block.match(/current price(?: Now)? \$(\d+[.]\d{2})/i) || block.match(/\$(\d+[.]\d{2})/);
+    if(!currentMatch) continue;
+    const price = parseFloat(currentMatch[1]);
+    let oldPrice = null, promo = false, discountText = '';
+    if(nowMatch){
+      promo = true;
+      oldPrice = parseFloat(nowMatch[2]);
+      const pct = Math.round((1 - price/oldPrice) * 100);
+      discountText = `${pct}%`;
+    } else if(/rollback|save with|you save/i.test(block)) {
+      promo = true;
+      discountText = 'deal';
+    }
+    deals.push({
+      title,
+      store:'Walmart',
+      area:areaSelect.value,
+      price,
+      oldPrice,
+      promo,
+      discountText,
+      note: promo ? 'Promo réelle détectée sur la source Walmart' : 'Résultat réel Walmart',
+      link
+    });
+    if(deals.length >= 12) break;
+  }
+  return deals;
+}
+
+async function runSearch(query){
+  resultsEl.innerHTML = '<div class="empty">Recherche réelle en cours…</div>';
+  statsGrid.innerHTML = '';
+  try {
+    let deals = await fetchWalmartDeals(query);
+    if(promoOnly.checked) deals = deals.filter(d => d.promo);
+    if(sortSelect.value === 'price') deals.sort((a,b) => Number(a.price) - Number(b.price));
+    else if(sortSelect.value === 'store') deals.sort((a,b) => a.store.localeCompare(b.store));
+    else deals.sort((a,b) => Number(!!b.promo) - Number(!!a.promo) || Number(a.price)-Number(b.price));
+    renderStats(deals);
+    renderDeals(deals);
+    if(!deals.length){
+      emptyState.textContent = 'Aucun résultat fiable trouvé pour cette recherche.';
+    }
+  } catch (e) {
+    emptyState.style.display = 'block';
+    emptyState.textContent = 'Échec de la recherche réelle pour le moment.';
+    resultsEl.innerHTML = '';
+  }
 }
 
 form.addEventListener('submit', e => { e.preventDefault(); runSearch(queryInput.value.trim()); });

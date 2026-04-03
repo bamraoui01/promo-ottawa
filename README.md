@@ -3,7 +3,7 @@
 Prototype web pour chercher un produit et voir où le trouver à Ottawa avec promo / meilleur prix.
 
 ## Version actuelle
-- prototype intelligent avec résultats simulés plausibles
+- version réelle initiale branchée sur Walmart Canada via lecture web structurée
 - tri par promo / prix / magasin
 - filtre promo seulement
 - zones: Ottawa, Orléans, Kanata, Gatineau
